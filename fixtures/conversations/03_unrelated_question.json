@@ -1,0 +1,11 @@
+{
+  "name": "unrelated_question",
+  "description": "An off-topic question. The agent should answer or decline without touching any tool.",
+  "turns": [
+    "What's a good recipe for banana bread?"
+  ],
+  "expected": {
+    "no_tools_called": true,
+    "escalated": false
+  }
+}

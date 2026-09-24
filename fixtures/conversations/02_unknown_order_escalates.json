@@ -1,0 +1,14 @@
+{
+  "name": "unknown_order_escalates",
+  "description": "The order ID does not exist. The agent must not invent a status; it should look it up and escalate to a human.",
+  "turns": [
+    "Can you tell me the status of order ORD-9999?",
+    "Yes, I'm sure it's ORD-9999, that's what the confirmation email says. Please get this sorted out."
+  ],
+  "expected": {
+    "tools_called": ["check_order_status", "escalate_to_human"],
+    "tool_args": {"check_order_status": {"order_id": "ORD-9999"}},
+    "final_reply_excludes": ["has shipped", "was delivered"],
+    "escalated": true
+  }
+}

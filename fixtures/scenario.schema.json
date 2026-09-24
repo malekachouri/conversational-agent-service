@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Conversation scenario",
+  "description": "A multi-turn conversation replayed against POST /chat, with the outcomes it must produce.",
+  "type": "object",
+  "required": ["name", "turns", "expected"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+    "description": {"type": "string"},
+    "turns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tools_called": {
+          "description": "Every tool listed must be called at least once during the conversation.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/tool"}
+        },
+        "tools_not_called": {
+          "description": "No tool listed may be called at any point in the conversation.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/tool"}
+        },
+        "no_tools_called": {
+          "description": "If true, the agent must not call any tool at all.",
+          "type": "boolean"
+        },
+        "tool_args": {
+          "description": "For each tool, at least one call must include these argument values (strings compared case-insensitively).",
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/tool"},
+          "additionalProperties": {"type": "object"}
+        },
+        "final_reply_contains_any": {
+          "description": "The last reply must contain at least one of these substrings (case-insensitive).",
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "final_reply_excludes": {
+          "description": "The last reply must contain none of these substrings (case-insensitive).",
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "escalated": {
+          "description": "Expected end state: whether an escalation ticket exists for the session.",
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "tool": {"enum": ["check_order_status", "escalate_to_human"]}
+  }
+}

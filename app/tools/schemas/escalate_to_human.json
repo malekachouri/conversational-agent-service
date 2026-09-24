@@ -1,0 +1,16 @@
+{
+  "name": "escalate_to_human",
+  "description": "Hand the conversation over to a human support agent and open a support ticket. Use only when you cannot resolve the issue yourself: the order cannot be found, the customer explicitly asks for a person, or the problem needs a refund, replacement or other action you have no tool for. Do not escalate questions you have already answered.",
+  "strict": true,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "reason": {
+        "type": "string",
+        "description": "One or two sentences for the human agent summarising the customer's problem and why it is being escalated."
+      }
+    },
+    "required": ["reason"],
+    "additionalProperties": false
+  }
+}

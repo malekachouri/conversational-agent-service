@@ -1,0 +1,16 @@
+{
+  "name": "check_order_status",
+  "description": "Look up the current status of a customer's order by its order ID (format like ORD-1001). Returns found=false when no such order exists. Use this whenever the customer asks where an order is, whether it shipped, or when it will arrive.",
+  "strict": true,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "description": "The order identifier exactly as the customer gave it, e.g. ORD-1001."
+      }
+    },
+    "required": ["order_id"],
+    "additionalProperties": false
+  }
+}

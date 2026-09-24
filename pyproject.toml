@@ -1,0 +1,12 @@
+[project]
+name = "conversational-agent-service"
+version = "0.1.0"
+description = "A tool-using Claude agent behind FastAPI, with replayable conversation tests and a CI/CD pipeline."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "conversation: replays a JSON conversation fixture against the /chat API",
+]

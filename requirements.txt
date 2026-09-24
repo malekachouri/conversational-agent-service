@@ -1,0 +1,9 @@
+# Runtime dependencies (pinned). Installed into the production image.
+anthropic==1.8.0
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+sqlalchemy==2.0.54
+psycopg[binary]==3.3.6
+prometheus-client==0.26.0
+pydantic==2.13.5
+jsonschema==4.26.0

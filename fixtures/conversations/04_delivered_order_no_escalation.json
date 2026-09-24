@@ -1,0 +1,14 @@
+{
+  "name": "delivered_order_no_escalation",
+  "description": "The order was already delivered. The agent should say so and must NOT escalate - the question is resolved.",
+  "turns": [
+    "Where is my order ORD-1003? I just want to know what's going on with it."
+  ],
+  "expected": {
+    "tools_called": ["check_order_status"],
+    "tools_not_called": ["escalate_to_human"],
+    "tool_args": {"check_order_status": {"order_id": "ORD-1003"}},
+    "final_reply_contains_any": ["delivered"],
+    "escalated": false
+  }
+}

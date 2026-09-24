@@ -1,0 +1,15 @@
+{
+  "name": "order_status_lookup",
+  "description": "Customer asks about an order without an ID, then supplies it. The agent should ask for the ID, look it up, and report that it has shipped.",
+  "turns": [
+    "Hi! I placed an order last week and I'm wondering where it is.",
+    "Sure, the order number is ORD-1001."
+  ],
+  "expected": {
+    "tools_called": ["check_order_status"],
+    "tools_not_called": ["escalate_to_human"],
+    "tool_args": {"check_order_status": {"order_id": "ORD-1001"}},
+    "final_reply_contains_any": ["shipped", "on its way", "in transit"],
+    "escalated": false
+  }
+}

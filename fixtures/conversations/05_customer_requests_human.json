@@ -1,0 +1,12 @@
+{
+  "name": "customer_requests_human",
+  "description": "The customer explicitly asks for a person. The agent should escalate straight away without looking anything up.",
+  "turns": [
+    "I don't want to talk to a bot. Please put me through to a human."
+  ],
+  "expected": {
+    "tools_called": ["escalate_to_human"],
+    "tools_not_called": ["check_order_status"],
+    "escalated": true
+  }
+}

@@ -1,0 +1,172 @@
+# CI/CD for conversational-agent-service.
+#
+#   test     -> unit tests + conversation replay suite (in-process, mock LLM)
+#   image    -> build image, replay the suite against the running container,
+#               Trivy scan (fails on fixable HIGH/CRITICAL)
+#   publish  -> push the exact scanned image to GHCR + signed build provenance
+#               (pushes to main only)
+#
+# No long-lived secrets: GHCR auth uses the job's short-lived GITHUB_TOKEN, and
+# the provenance attestation is signed keylessly with the workflow's OIDC token.
+# Third-party actions are pinned to commit SHAs.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  LOCAL_IMAGE: conversational-agent-service:ci
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  test:
+    name: Tests (in-process)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests (unit + conversation replay, mock LLM)
+        env:
+          LLM_PROVIDER: mock
+        run: pytest -v
+
+  image:
+    name: Build, test & scan image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: ${{ env.LOCAL_IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start container
+        run: |
+          docker run -d --name agent -p 8000:8000 -e LLM_PROVIDER=mock "$LOCAL_IMAGE"
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8000/healthz && exit 0
+            sleep 1
+          done
+          echo "Container did not become healthy" >&2
+          exit 1
+
+      - name: Replay conversation suite against the running container
+        env:
+          AGENT_BASE_URL: http://localhost:8000
+        run: pytest -v tests/test_conversations.py tests/test_api.py
+
+      - name: Container logs
+        if: always()
+        run: docker logs agent || true
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.LOCAL_IMAGE }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          vuln-type: os,library
+          exit-code: "1"
+
+      - name: Export scanned image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: docker save "$LOCAL_IMAGE" -o "$RUNNER_TEMP/image.tar"
+
+      - name: Upload scanned image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image
+          path: ${{ runner.temp }}/image.tar
+          retention-days: 1
+
+  publish:
+    name: Push to GHCR
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write      # push to ghcr.io with the ephemeral GITHUB_TOKEN
+      id-token: write      # OIDC token for keyless (Sigstore) signing
+      attestations: write  # store the build provenance attestation
+    steps:
+      - name: Download scanned image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load image
+        working-directory: ${{ runner.temp }}
+        run: docker load -i image.tar
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push
+        id: push
+        working-directory: ${{ runner.temp }}
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          image="ghcr.io/${OWNER,,}/conversational-agent-service"
+          for tag in "sha-${GITHUB_SHA::12}" latest; do
+            docker tag "$LOCAL_IMAGE" "$image:$tag"
+            docker push "$image:$tag"
+          done
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$image:latest")"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.push.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
