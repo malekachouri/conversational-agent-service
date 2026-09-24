@@ -2,6 +2,8 @@
 
 A small customer-support agent built on Claude, set up the way a production AI service needs to be: tools that can be tested on their own, conversation tests that check **outcomes**, Prometheus metrics, a hardened container, and a CI/CD pipeline that scans the image and pushes it with no stored credentials.
 
+> **New to AI or DevOps?** Start with [GUIDE.md](GUIDE.md), a beginner-friendly walkthrough. [BUILD_STEPS.md](BUILD_STEPS.md) explains how the project was built, step by step.
+
 The domain is deliberately tiny (look up an order, or hand off to a human). The project is about the engineering around the agent, not the app.
 
 ## What it demonstrates
