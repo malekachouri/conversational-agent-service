@@ -8,9 +8,11 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -20,10 +22,12 @@ from app.config import Settings
 from app.db import init_db, make_engine, make_session_factory
 from app.llm import LLMUnavailableError, build_llm
 from app.metrics import CHAT_LATENCY, CHAT_REQUESTS
-from app.models import ConversationMessage, Escalation
+from app.models import ConversationMessage, Escalation, Order
 from app.tools import default_registry
 
 logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 class ChatRequest(BaseModel):
@@ -47,6 +51,17 @@ class ChatResponse(BaseModel):
 class EscalationOut(BaseModel):
     ticket_id: str
     reason: str
+
+
+class OrderOut(BaseModel):
+    order_id: str
+    item: str
+    status: str
+
+
+class InfoOut(BaseModel):
+    llm_provider: str
+    model: str | None
 
 
 class SessionOut(BaseModel):
@@ -115,6 +130,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             message_count=count,
             escalated=bool(escalations),
             escalations=[EscalationOut(ticket_id=e.ticket_id, reason=e.reason) for e in escalations],
+        )
+
+    @app.get("/", include_in_schema=False)
+    def ui() -> FileResponse:
+        """Web chat UI: talk to the agent and watch which tools it calls."""
+        return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/orders", response_model=list[OrderOut])
+    def list_orders() -> list[OrderOut]:
+        """Demo orders, so the UI can show what the agent can look up."""
+        with session_factory() as db:
+            orders = db.scalars(select(Order).order_by(Order.order_id)).all()
+        return [OrderOut(order_id=o.order_id, item=o.item, status=o.status) for o in orders]
+
+    @app.get("/info", response_model=InfoOut)
+    def info() -> InfoOut:
+        return InfoOut(
+            llm_provider=settings.llm_provider,
+            model=settings.anthropic_model if settings.llm_provider == "anthropic" else None,
         )
 
     @app.get("/healthz")

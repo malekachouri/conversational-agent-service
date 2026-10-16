@@ -51,3 +51,23 @@ def test_metrics_track_requests_and_tool_outcomes(api_client):
     assert _metric(after, "chat_request_duration_seconds_count") > _metric(
         before, "chat_request_duration_seconds_count"
     )
+
+
+def test_web_ui_is_served(api_client):
+    resp = api_client.get("/")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/html")
+    assert "<title>Order Support Agent</title>" in resp.text
+
+
+def test_orders_lists_demo_orders(api_client):
+    orders = {o["order_id"]: o["status"] for o in api_client.get("/orders").json()}
+    assert orders["ORD-1001"] == "shipped"
+    assert orders["ORD-1003"] == "delivered"
+
+
+def test_info_reports_llm_mode(api_client):
+    info = api_client.get("/info").json()
+    assert info["llm_provider"] in {"mock", "anthropic"}
+    if info["llm_provider"] == "mock":
+        assert info["model"] is None

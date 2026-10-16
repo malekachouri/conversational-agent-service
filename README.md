@@ -68,7 +68,7 @@ sequenceDiagram
 
 ```
 app/
-  main.py            FastAPI app factory: /chat, /sessions/{id}, /healthz, /metrics
+  main.py            FastAPI app factory: /chat, /sessions/{id}, /orders, /info, /healthz, /metrics
   agent.py           Tool-use loop and system prompt; persists history
   llm.py             AnthropicLLM (real) and MockLLM (deterministic), same interface
   tools/
@@ -77,6 +77,7 @@ app/
     schemas/*.json   Tool definitions: sent to Claude and used for validation
   models.py, db.py   SQLAlchemy models, engine, demo seed data
   metrics.py         Prometheus counters and histogram
+  static/index.html  Web chat UI served at / (no build step, no external assets)
 fixtures/
   scenario.schema.json         Schema for a conversation scenario
   conversations/*.json         The replayed scenarios
@@ -140,6 +141,16 @@ uvicorn --factory app.main:create_app --reload     # SQLite at ./dev.db
 # no API key? run offline with the mock:
 LLM_PROVIDER=mock uvicorn --factory app.main:create_app --reload
 ```
+
+### Web UI
+
+Open **http://localhost:8000/** to chat with the agent in the browser. Each reply is tagged with the tools the agent called. A side panel shows:
+
+- **Session:** the session ID, how many messages are stored, whether the conversation was escalated, and the tickets that were created.
+- **Agent actions:** for every turn, each tool call with its exact input and output, marked OK or ERROR.
+- **Demo orders:** the orders in the database, each with a one-click "Ask" button.
+
+The page is a single static file (`app/static/index.html`) that calls the same API as the tests, so what you see is exactly what the conversation suite asserts on. The interactive API docs are still at `/docs`.
 
 ```bash
 curl -s localhost:8000/chat -H 'content-type: application/json' \

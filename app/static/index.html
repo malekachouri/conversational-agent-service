@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order Support Agent</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e3e6eb;
+    --text: #1c2430;
+    --muted: #667085;
+    --accent: #0f766e;
+    --accent-soft: #e6f4f2;
+    --on-accent: #ffffff;
+    --user: #1f3a5f;
+    --user-text: #ffffff;
+    --bot: #eef1f5;
+    --ok: #15803d;
+    --ok-soft: #e7f6ec;
+    --warn: #b45309;
+    --warn-soft: #fdf1e3;
+    --err: #b91c1c;
+    --err-soft: #fdeaea;
+    --code: #f7f8fa;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1419;
+      --panel: #161c23;
+      --border: #263040;
+      --text: #e6e9ee;
+      --muted: #8b95a5;
+      --accent: #2dd4bf;
+      --accent-soft: #123532;
+    --on-accent: #04201d;
+      --user: #2b4c7e;
+      --user-text: #ffffff;
+      --bot: #1e2630;
+      --ok: #4ade80;
+      --ok-soft: #12301f;
+      --warn: #fbbf24;
+      --warn-soft: #33270f;
+      --err: #f87171;
+      --err-soft: #3a1717;
+      --code: #11161c;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header { flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; white-space: nowrap; }
+  header .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+  .badge {
+    font-size: 12px; padding: 2px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 600;
+  }
+  .spacer { flex: 1; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    padding: 6px 12px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  main {
+    display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px;
+    padding: 16px 20px; height: calc(100% - 53px);
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---- chat ---- */
+  .chat { display: flex; flex-direction: column; min-height: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 78%; display: flex; flex-direction: column; gap: 6px; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .bubble { padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; }
+  .user .bubble { background: var(--user); color: var(--user-text); border-bottom-right-radius: 4px; }
+  .bot .bubble { background: var(--bot); border-bottom-left-radius: 4px; }
+  .err .bubble { background: var(--err-soft); color: var(--err); }
+  .who { font-size: 11px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 12px; padding: 2px 8px; border-radius: 6px; font-family: ui-monospace, Menlo, Consolas, monospace;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .chip.esc { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad { background: var(--err-soft); color: var(--err); }
+  .chip.none { background: transparent; color: var(--muted); padding-left: 0; font-family: inherit; }
+
+  .empty { margin: auto; text-align: center; max-width: 520px; color: var(--muted); }
+  .empty h2 { color: var(--text); font-size: 18px; margin: 0 0 6px; }
+  .suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+  .suggestions button { border-radius: 999px; font-size: 13px; }
+
+  .typing { color: var(--muted); font-size: 13px; padding-left: 4px; }
+  .typing span { animation: blink 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+
+  form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
+  #input {
+    flex: 1; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; outline: none;
+  }
+  #input:focus { border-color: var(--accent); }
+
+  /* ---- inspector ---- */
+  .inspector { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; }
+  .inspector .card { padding: 14px 16px; }
+  .inspector h3 {
+    margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+  }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
+  .status { font-weight: 600; font-family: inherit; }
+  .status.yes { color: var(--warn); }
+  .status.no { color: var(--ok); }
+  .tickets { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+  .tickets li { padding: 6px 8px; border-radius: 6px; background: var(--warn-soft); margin-top: 6px; }
+  .tickets b { font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+  .turn { border-left: 2px solid var(--border); padding-left: 10px; margin-bottom: 14px; }
+  .turn-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .turn-title q { color: var(--text); }
+  .call { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+  .call-head {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 13px;
+    background: var(--code); font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .call-head .tag { margin-left: auto; font-size: 11px; font-family: inherit; font-weight: 600; }
+  .tag.ok { color: var(--ok); }
+  .tag.bad { color: var(--err); }
+  .call pre {
+    margin: 0; padding: 8px 10px; font-size: 12px; overflow-x: auto;
+    font-family: ui-monospace, Menlo, Consolas, monospace; border-top: 1px solid var(--border);
+  }
+  .call .label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; font-family: inherit; }
+  .muted { color: var(--muted); font-size: 13px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 6px 4px; border-top: 1px solid var(--border); }
+  td:first-child { font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
+  td.note { font-family: inherit; white-space: normal; padding-top: 10px; }
+  td button { font-size: 12px; padding: 2px 8px; }
+  .pill { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--bot); }
+
+  @media (max-width: 900px) {
+    header { padding: 10px 16px; }
+    main { grid-template-columns: 1fr; height: auto; padding: 12px 16px; }
+    .chat { height: 70vh; }
+    .msg { max-width: 92%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot"></span>
+  <h1>Order Support Agent</h1>
+  <span class="badge" id="mode">…</span>
+  <span class="spacer"></span>
+  <button id="new-session" type="button">New conversation</button>
+</header>
+
+<main>
+  <section class="card chat" aria-label="Conversation">
+    <div id="messages">
+      <div class="empty" id="empty">
+        <h2>Ask about an order</h2>
+        <p>The agent can look up an order's status or hand you over to a human.
+           The panel on the right shows exactly which tools it calls and what they return.</p>
+        <div class="suggestions" id="suggestions"></div>
+      </div>
+    </div>
+    <form id="composer" autocomplete="off">
+      <input id="input" placeholder="Type a message, e.g. Where is my order ORD-1001?" maxlength="4000" aria-label="Message">
+      <button class="primary" id="send" type="submit">Send</button>
+    </form>
+  </section>
+
+  <aside class="inspector" aria-label="What the agent did">
+    <div class="card">
+      <h3>Session</h3>
+      <dl class="kv">
+        <dt>ID</dt><dd id="s-id"></dd>
+        <dt>Messages stored</dt><dd id="s-count">0</dd>
+        <dt>Escalated</dt><dd><span class="status no" id="s-esc">no</span></dd>
+      </dl>
+      <ul class="tickets" id="s-tickets"></ul>
+    </div>
+
+    <div class="card">
+      <h3>Agent actions</h3>
+      <div id="timeline"><p class="muted">No tool calls yet. Send a message to see what the agent does.</p></div>
+    </div>
+
+    <div class="card">
+      <h3>Demo orders</h3>
+      <table><tbody id="orders"><tr><td class="muted">Loading…</td></tr></tbody></table>
+    </div>
+  </aside>
+</main>
+
+<script>
+(() => {
+  const SUGGESTIONS = [
+    "Where is my order ORD-1001?",
+    "Where is ORD-1003?",
+    "Status of ORD-9999?",
+    "I want to talk to a human",
+    "Banana bread recipe?",
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const messages = $("messages");
+  const input = $("input");
+  const sendBtn = $("send");
+  let sessionId = "";
+  let turn = 0;
+
+  function newId() {
+    const rand = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID().slice(0, 8)
+      : Math.random().toString(16).slice(2, 10);
+    return "web-" + rand;
+  }
+
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;   // textContent: never inject HTML
+    return node;
+  }
+
+  function scrollDown() { messages.scrollTop = messages.scrollHeight; }
+
+  function addMessage(role, text, toolCalls) {
+    $("empty")?.remove();
+    const wrap = el("div", "msg " + role);
+    wrap.append(el("span", "who", role === "user" ? "You" : role === "bot" ? "Agent" : "Error"));
+    wrap.append(el("div", "bubble", text));
+    if (role === "bot") {
+      const chips = el("div", "chips");
+      if (toolCalls.length === 0) {
+        chips.append(el("span", "chip none", "no tools used"));
+      }
+      for (const call of toolCalls) {
+        const cls = call.is_error ? "chip bad" : call.name === "escalate_to_human" ? "chip esc" : "chip";
+        chips.append(el("span", cls, call.name));
+      }
+      wrap.append(chips);
+    }
+    messages.append(wrap);
+    scrollDown();
+  }
+
+  function showTyping(on) {
+    $("typing")?.remove();
+    if (!on) return;
+    const t = el("div", "typing");
+    t.id = "typing";
+    t.append("Agent is working");
+    for (let i = 0; i < 3; i++) t.append(el("span", null, "."));
+    messages.append(t);
+    scrollDown();
+  }
+
+  function addToTimeline(userText, toolCalls) {
+    const timeline = $("timeline");
+    if (turn === 1) timeline.replaceChildren();
+    const block = el("div", "turn");
+    const title = el("div", "turn-title", "Turn " + turn + " · ");
+    title.append(el("q", null, userText));
+    block.append(title);
+    if (toolCalls.length === 0) {
+      block.append(el("p", "muted", "Answered directly, no tool called."));
+    }
+    toolCalls.forEach((call, i) => {
+      const box = el("div", "call");
+      const head = el("div", "call-head", (i + 1) + ". " + call.name);
+      head.append(el("span", "tag " + (call.is_error ? "bad" : "ok"), call.is_error ? "ERROR" : "OK"));
+      box.append(head);
+      for (const [label, value] of [["input", call.input], ["output", call.output]]) {
+        const pre = el("pre");
+        pre.append(el("span", "label", label));
+        pre.append(JSON.stringify(value, null, 2));
+        box.append(pre);
+      }
+      block.append(box);
+    });
+    timeline.prepend(block);   // newest turn on top
+  }
+
+  async function refreshSession() {
+    $("s-id").textContent = sessionId;
+    const resp = await fetch("/sessions/" + encodeURIComponent(sessionId));
+    const tickets = $("s-tickets");
+    tickets.replaceChildren();
+    if (resp.status === 404) {
+      $("s-count").textContent = "0";
+      setEscalated(false);
+      return;
+    }
+    const data = await resp.json();
+    $("s-count").textContent = String(data.message_count);
+    setEscalated(data.escalated);
+    for (const t of data.escalations) {
+      const li = el("li");
+      li.append(el("b", null, t.ticket_id), " · " + t.reason);
+      tickets.append(li);
+    }
+  }
+
+  function setEscalated(yes) {
+    const s = $("s-esc");
+    s.textContent = yes ? "yes, a human was asked to help" : "no";
+    s.className = "status " + (yes ? "yes" : "no");
+  }
+
+  async function send(text) {
+    text = text.trim();
+    if (!text) return;
+    input.value = "";
+    input.disabled = sendBtn.disabled = true;
+    addMessage("user", text);
+    showTyping(true);
+    try {
+      const resp = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, message: text }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      showTyping(false);
+      if (!resp.ok) {
+        const detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data);
+        addMessage("err", "Request failed (HTTP " + resp.status + "): " + detail);
+        return;
+      }
+      turn += 1;
+      addMessage("bot", data.reply, data.tool_calls);
+      addToTimeline(text, data.tool_calls);
+      await refreshSession();
+    } catch (e) {
+      showTyping(false);
+      addMessage("err", "Could not reach the API: " + e.message);
+    } finally {
+      input.disabled = sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  function resetConversation() {
+    sessionId = newId();
+    turn = 0;
+    messages.replaceChildren();
+    const empty = el("div", "empty");
+    empty.id = "empty";
+    empty.append(el("h2", null, "Ask about an order"));
+    empty.append(el("p", null,
+      "The agent can look up an order's status or hand you over to a human. " +
+      "The panel on the right shows exactly which tools it calls and what they return."));
+    const sug = el("div", "suggestions");
+    for (const s of SUGGESTIONS) {
+      const b = el("button", null, s);
+      b.type = "button";
+      b.addEventListener("click", () => send(s));
+      sug.append(b);
+    }
+    empty.append(sug);
+    messages.append(empty);
+    $("timeline").replaceChildren(el("p", "muted", "No tool calls yet. Send a message to see what the agent does."));
+    // A brand-new session has nothing stored yet, so no need to ask the API.
+    $("s-id").textContent = sessionId;
+    $("s-count").textContent = "0";
+    $("s-tickets").replaceChildren();
+    setEscalated(false);
+    input.focus();
+  }
+
+  async function loadOrders() {
+    const body = $("orders");
+    try {
+      const orders = await (await fetch("/orders")).json();
+      body.replaceChildren();
+      for (const o of orders) {
+        const tr = el("tr");
+        tr.append(el("td", null, o.order_id));
+        tr.append(el("td", null, o.item));
+        const st = el("td");
+        st.append(el("span", "pill", o.status));
+        tr.append(st);
+        const act = el("td");
+        const b = el("button", null, "Ask");
+        b.type = "button";
+        b.addEventListener("click", () => send("Where is my order " + o.order_id + "?"));
+        act.append(b);
+        tr.append(act);
+        body.append(tr);
+      }
+      const tr = el("tr");
+      const td = el("td", "muted note", "Any other ID (e.g. ORD-9999) does not exist and should be escalated.");
+      td.colSpan = 4;
+      tr.append(td);
+      body.append(tr);
+    } catch (e) {
+      body.replaceChildren(el("tr", null, "Could not load orders."));
+    }
+  }
+
+  async function loadInfo() {
+    try {
+      const info = await (await fetch("/info")).json();
+      $("mode").textContent = info.llm_provider === "mock"
+        ? "mock LLM (offline)"
+        : "Claude · " + info.model;
+    } catch (e) {
+      $("mode").textContent = "unknown mode";
+    }
+  }
+
+  $("composer").addEventListener("submit", (e) => { e.preventDefault(); send(input.value); });
+  $("new-session").addEventListener("click", resetConversation);
+
+  loadInfo();
+  loadOrders();
+  resetConversation();
+})();
+</script>
+</body>
+</html>

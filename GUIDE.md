@@ -118,6 +118,7 @@ conversational-agent-service/
 │   ├── models.py               database tables: orders, messages, escalations
 │   ├── db.py                   database connection + the 4 demo orders
 │   ├── metrics.py              definitions of the Prometheus numbers
+│   ├── static/index.html       the chat web page (served at /)
 │   └── tools/
 │       ├── functions.py        the real actions (look up order, create ticket)
 │       ├── registry.py         checks the AI's requests, then runs the right function
@@ -320,7 +321,14 @@ LLM_PROVIDER=mock uvicorn --factory app.main:create_app --reload
 $env:LLM_PROVIDER="mock"; uvicorn --factory app.main:create_app --reload
 ```
 
-Leave it running. The easiest way to test it is **in your browser**:
+Leave it running. The easiest way to try it is the **chat page**: open **http://localhost:8000/** in your browser.
+
+- Type a message, or click one of the suggested questions or an **Ask** button next to a demo order.
+- Under each reply, small tags show which tools the agent used (orange means it escalated to a human).
+- The right-hand panel shows **what the agent actually did**: every tool call with its exact input and output, the number of stored messages, and any escalation tickets that were created.
+- **New conversation** starts a fresh session.
+
+You can also use the technical API page:
 1. Open **http://localhost:8000/docs**. This interactive page is generated automatically by FastAPI.
 2. Click `POST /chat`, then **Try it out**, and paste:
    ```json
